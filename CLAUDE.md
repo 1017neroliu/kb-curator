@@ -99,6 +99,11 @@ ChangeEvent → ClassifyChange → ExtractKnowledge → DetectConflict
 - commit message 使用中文，简洁描述变更内容，格式：`模块: 简要描述`
 - 同一逻辑变更归为一个 commit，不拆分过细
 
+### Changelog
+- 每次提交后，同步更新 `CHANGELOG.md`（文件不存在时自动创建）
+- 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/)，按 `Added / Changed / Fixed / Removed` 分类
+- 每条记录以日期分组，新条目加在文件顶部最新日期下
+
 ## 运行方式
 
 ```bash
