@@ -302,3 +302,49 @@ export interface KnowledgeBaseOverview {
   deprecated_entries: number;
   data_sources_count: number;
 }
+
+// ============================================================
+// QA (Question Answering)
+// ============================================================
+
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface QARequest {
+  kb_id: string;
+  question: string;
+  history?: ChatMessage[];
+  top_k?: number;
+  graph_expand_depth?: number;
+}
+
+export interface QASource {
+  source_type: 'vector' | 'graph';
+  chunk_id?: string | null;
+  entry_id?: string | null;
+  content?: string | null;
+  score?: number | null;
+  entity_id?: string | null;
+  entity_name?: string | null;
+  relation_type?: string | null;
+  neighbor_name?: string | null;
+}
+
+export interface QAResponse {
+  answer: string;
+  sources: QASource[];
+  question: string;
+  kb_id: string;
+}
+
+export interface QASSESourceEvent {
+  type: 'sources';
+  sources: QASource[];
+}
+
+export interface QASSETokenEvent {
+  type: 'token';
+  content: string;
+}

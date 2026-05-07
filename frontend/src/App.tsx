@@ -10,6 +10,7 @@ import Events from './pages/Events';
 import Sources from './pages/Sources';
 import Quality from './pages/Quality';
 import Graph from './pages/Graph';
+import QA from './pages/QA';
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
             <Route path="/sources" element={<Sources />} />
             <Route path="/quality" element={<Quality />} />
             <Route path="/graph" element={<Graph />} />
+            <Route path="/qa" element={<QA />} />
           </Route>
         </Routes>
       </AntApp>

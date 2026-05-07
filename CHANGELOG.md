@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/zh-CN/).
 
+## 2026-05-07
+
+### Added
+- 知识库问答（QA）功能，支持检索增强生成（RAG）：
+  - 后端新增 QA schemas：`ChatMessage`、`QARequest`、`QASource`、`QAResponse`
+  - 后端新增 `QASettings` 配置类（top_k、graph_expand_limit、context_max_chars、qa_temperature、streaming_enabled）
+  - 后端新增 `QAService` 服务类，实现 embed→vector search→graph expand→context assembly→LLM generate 全流程
+  - 后端新增 SSE 流式问答接口 `POST /api/v1/qa/ask/stream`（先发 sources 事件，再逐 token 流出）
+  - 后端新增非流式问答接口 `POST /api/v1/qa/ask`
+  - 前端新增 QA 类型定义（`ChatMessage`、`QARequest`、`QASource`、`QAResponse`、`QASSESourceEvent`、`QASSETokenEvent`）
+  - 前端新增 `useQA` hooks（`useQAAsk` 非流式、`useQAStream` 流式 SSE 解析）
+  - 前端新增聊天式问答页面（流式输出、来源引用折叠面板、清空对话）
+  - 前端导航新增"知识问答"菜单项
+
 ## 2025-05-07
 
 ### Added

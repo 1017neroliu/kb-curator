@@ -14,6 +14,7 @@ from kb_curator.api.routes import (
     events,
     knowledge_bases,
     knowledge_graph,
+    qa,
     quality,
     reviews,
     sources,
@@ -87,6 +88,7 @@ OPENAPI_TAGS = [
     {"name": "Quality", "description": "质量巡检 + 报告"},
     {"name": "Knowledge Graph", "description": "知识图谱（实体/关系/统计）"},
     {"name": "Agent", "description": "LangGraph Agent 触发/恢复/状态"},
+    {"name": "QA", "description": "知识库问答（检索增强生成）"},
 ]
 
 
@@ -123,6 +125,7 @@ def create_app() -> FastAPI:
     app.include_router(quality.router, prefix="/api/v1")
     app.include_router(knowledge_graph.router, prefix="/api/v1")
     app.include_router(agent.router, prefix="/api/v1")
+    app.include_router(qa.router, prefix="/api/v1")
 
     return app
 

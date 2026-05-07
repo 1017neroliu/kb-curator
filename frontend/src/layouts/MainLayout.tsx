@@ -10,6 +10,7 @@ import {
   SafetyCertificateOutlined,
   AppstoreOutlined,
   PlusOutlined,
+  CommentOutlined,
 } from '@ant-design/icons';
 import { useKnowledgeBases, useCreateKnowledgeBase } from '../hooks/useKnowledgeBases';
 
@@ -24,6 +25,7 @@ const menuItems = [
   { key: '/sources', icon: <DatabaseOutlined />, label: '数据源' },
   { key: '/quality', icon: <SafetyCertificateOutlined />, label: '质量报告' },
   { key: '/graph', icon: <AppstoreOutlined />, label: '知识图谱' },
+  { key: '/qa', icon: <CommentOutlined />, label: '知识问答' },
 ];
 
 export default function MainLayout() {

@@ -389,3 +389,40 @@ class ContradictionJudgment(BaseModel):
     is_contradiction: bool
     explanation: str
     severity: Severity = Severity.WARNING
+
+
+# ============================================================
+# QA (Question Answering)
+# ============================================================
+
+class ChatMessage(BaseModel):
+    """A single chat message in a QA conversation."""
+    role: Literal["user", "assistant"]
+    content: str
+
+class QARequest(BaseModel):
+    """Request body for a QA query."""
+    kb_id: str
+    question: str
+    history: list[ChatMessage] = []
+    top_k: int = Field(default=5, ge=1, le=20)
+    graph_expand_depth: int = Field(default=1, ge=0, le=3)
+
+class QASource(BaseModel):
+    """A single source reference in a QA response."""
+    source_type: Literal["vector", "graph"]
+    chunk_id: str | None = None
+    entry_id: str | None = None
+    content: str | None = None
+    score: float | None = None
+    entity_id: str | None = None
+    entity_name: str | None = None
+    relation_type: str | None = None
+    neighbor_name: str | None = None
+
+class QAResponse(BaseModel):
+    """Response model for a QA query."""
+    answer: str
+    sources: list[QASource] = []
+    question: str
+    kb_id: str

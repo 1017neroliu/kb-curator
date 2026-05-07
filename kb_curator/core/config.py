@@ -83,6 +83,16 @@ class AuthSettings(BaseSettings):
     token_expire_minutes: int = Field(default=1440, ge=1)
 
 
+class QASettings(BaseSettings):
+    """QA (Question Answering) configuration."""
+
+    top_k: int = Field(default=5, ge=1, le=20, description="Default number of chunks to retrieve")
+    graph_expand_limit: int = Field(default=20, ge=1, description="Max entities to expand from graph")
+    context_max_chars: int = Field(default=4000, ge=500, description="Max characters for assembled context")
+    qa_temperature: float = Field(default=0.3, ge=0.0, le=2.0, description="Temperature for QA LLM calls")
+    streaming_enabled: bool = Field(default=True, description="Whether streaming QA is enabled")
+
+
 class AppSettings(BaseSettings):
     """Main application settings, loaded from environment variables or .env file."""
 
@@ -121,6 +131,7 @@ class AppSettings(BaseSettings):
     redis: RedisSettings = Field(default_factory=RedisSettings)
     schedule: ScheduleSettings = Field(default_factory=ScheduleSettings)
     auth: AuthSettings = Field(default_factory=AuthSettings)
+    qa: QASettings = Field(default_factory=QASettings)
 
     @field_validator("environment")
     @classmethod
