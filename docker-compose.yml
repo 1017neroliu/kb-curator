@@ -1,0 +1,118 @@
+version: "3.8"
+
+services:
+  # ---- API Server ----
+  api:
+    build: .
+    ports:
+      - "${KB_CURATOR_API_PORT:-8000}:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      KB_CURATOR_NEO4J_URI: bolt://host.docker.internal:7687
+      KB_CURATOR_NEO4J_USER: neo4j
+      KB_CURATOR_NEO4J_PASSWORD: ${NEO4J_PASSWORD:-password}
+      KB_CURATOR_REDIS_URL: redis://redis:6379/0
+      KB_CURATOR_CELERY_BROKER_URL: redis://redis:6379/1
+      KB_CURATOR_CELERY_RESULT_BACKEND: redis://redis:6379/2
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - app_data:/app/data
+    command: uvicorn kb_curator.main:app --host 0.0.0.0 --port 8000
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/api/v1/system/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ---- Celery Worker ----
+  worker:
+    build: .
+    depends_on:
+      redis:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      KB_CURATOR_NEO4J_URI: bolt://host.docker.internal:7687
+      KB_CURATOR_NEO4J_USER: neo4j
+      KB_CURATOR_NEO4J_PASSWORD: ${NEO4J_PASSWORD:-password}
+      KB_CURATOR_REDIS_URL: redis://redis:6379/0
+      KB_CURATOR_CELERY_BROKER_URL: redis://redis:6379/1
+      KB_CURATOR_CELERY_RESULT_BACKEND: redis://redis:6379/2
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - app_data:/app/data
+    command: celery -A kb_curator.worker worker -l info
+
+  # ---- Scheduler ----
+  scheduler:
+    build: .
+    depends_on:
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      KB_CURATOR_REDIS_URL: redis://redis:6379/0
+      KB_CURATOR_CELERY_BROKER_URL: redis://redis:6379/1
+    volumes:
+      - app_data:/app/data
+    command: python -m kb_curator.scheduler
+
+  # ---- Frontend ----
+  frontend:
+    build: ./frontend
+    ports:
+      - "${KB_CURATOR_FRONTEND_PORT:-3000}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ---- Redis ----
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---- Neo4j ----
+  # Note: uses host network mode because Docker bridge networking
+  # causes Bolt protocol handshake timeouts from the host.
+  neo4j:
+    image: neo4j:5-community
+    network_mode: host
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-password}
+      NEO4J_PLUGINS: '["apoc"]'
+    volumes:
+      - ./data/neo4j/data:/data
+      - ./data/neo4j/logs:/logs
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p ${NEO4J_PASSWORD:-password} 'RETURN 1'"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  app_data:
+  redis_data:
+  neo4j_data:
+  neo4j_logs:

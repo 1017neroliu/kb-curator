@@ -1,0 +1,82 @@
+[tool.poetry]
+name = "kb-curator"
+version = "0.1.0"
+description = "Knowledge Base Living Document Maintenance Agent"
+authors = ["KB-Curator Team"]
+readme = "README.md"
+packages = [{include = "kb_curator"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+# Web framework
+fastapi = "^0.115.0"
+uvicorn = {extras = ["standard"], version = "^0.34.0"}
+
+# Agent framework
+langchain = "^0.3.0"
+langchain-core = "^0.3.0"
+langgraph = "^0.2.0"
+langgraph-checkpoint-sqlite = "^2.0.0"
+
+# LLM
+litellm = "^1.60.0"
+
+# NLP
+spacy = "^3.8.0"
+
+# Vector store
+faiss-cpu = "^1.9.0"
+
+# Graph store
+neo4j = "^5.27.0"
+
+# Task queue
+celery = {extras = ["redis"], version = "^5.4.0"}
+
+# Scheduling
+apscheduler = "^3.10.0"
+
+# Database
+sqlalchemy = "^2.0.0"
+aiosqlite = "^0.20.0"
+
+# Configuration
+pydantic = "^2.10.0"
+pydantic-settings = "^2.7.0"
+
+# HTTP client
+httpx = "^0.28.0"
+
+# Logging
+structlog = "^24.4.0"
+
+# Utilities
+python-dotenv = "^1.0.0"
+python-multipart = "^0.0.18"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.0"
+pytest-asyncio = "^0.24.0"
+pytest-cov = "^6.0.0"
+httpx = "^0.28.0"
+ruff = "^0.8.0"
+
+[tool.poetry.scripts]
+kb-curator-api = "kb_curator.main:run_api"
+kb-curator-worker = "kb_curator.worker:run_worker"
+kb-curator-scheduler = "kb_curator.scheduler:run_scheduler"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
