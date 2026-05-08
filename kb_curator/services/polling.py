@@ -10,7 +10,10 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from kb_curator.adapters.confluence_adapter import ConfluenceAdapter
 from kb_curator.adapters.file_adapter import FileAdapter
+from kb_curator.adapters.jira_adapter import JiraAdapter
+from kb_curator.adapters.wiki_adapter import WikiAdapter
 from kb_curator.adapters.base import BaseDocumentSource, DocumentChange
 from kb_curator.core.config import get_settings
 from kb_curator.core.logging import get_logger
@@ -47,6 +50,12 @@ def create_adapter(
     """
     if source_type == "file":
         return FileAdapter(source_id, kb_id, connection_config)
+    elif source_type == "wiki":
+        return WikiAdapter(source_id, kb_id, connection_config)
+    elif source_type == "confluence":
+        return ConfluenceAdapter(source_id, kb_id, connection_config)
+    elif source_type == "jira":
+        return JiraAdapter(source_id, kb_id, connection_config)
     else:
         raise ValueError(f"Unsupported source type: {source_type}")
 

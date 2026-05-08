@@ -32,6 +32,29 @@ log = get_logger(__name__)
 router = APIRouter(prefix="/knowledge-bases/{kb_id}/sources", tags=["Data Sources"])
 
 
+def _validate_connection_config(source_type: str, config: dict) -> None:
+    """Validate required connection_config fields for each source type.
+
+    Raises:
+        HTTPException (400): If required fields are missing.
+    """
+    required_map: dict[str, list[str]] = {
+        "wiki": ["url"],
+        "confluence": ["url", "username", "api_token"],
+        "jira": ["url", "username", "api_token"],
+    }
+    required = required_map.get(source_type)
+    if not required:
+        return  # file and conversation_log have no strict requirements here
+
+    missing = [f for f in required if not config.get(f)]
+    if missing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Missing required connection_config fields for {source_type}: {', '.join(missing)}",
+        )
+
+
 @router.post("", response_model=DataSourceRead, status_code=status.HTTP_201_CREATED)
 async def create_source(
     kb_id: str,
@@ -44,6 +67,7 @@ async def create_source(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="kb_id mismatch",
         )
+    _validate_connection_config(body.source_type, body.connection_config or {})
     try:
         table = await create_data_source(session, **body.model_dump())
     except Exception as e:

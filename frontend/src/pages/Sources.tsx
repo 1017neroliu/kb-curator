@@ -41,9 +41,28 @@ export default function Sources() {
     source_type: SourceType;
     poll_interval_minutes: number;
     enabled: boolean;
+    // file fields
     base_path?: string;
     file_patterns?: string;
     recursive?: boolean;
+    // wiki fields
+    wiki_url?: string;
+    api_path?: string;
+    wiki_username?: string;
+    wiki_password?: string;
+    namespaces?: string;
+    // confluence fields
+    confluence_url?: string;
+    confluence_username?: string;
+    api_token?: string;
+    space_key?: string;
+    // jira fields
+    jira_url?: string;
+    jira_username?: string;
+    jira_api_token?: string;
+    project_key?: string;
+    jql?: string;
+    include_comments?: boolean;
   }) => {
     try {
       // Build connection_config from form fields
@@ -54,6 +73,26 @@ export default function Sources() {
           ? values.file_patterns.split(',').map((s) => s.trim())
           : ['*.md', '*.txt'];
         connection_config.recursive = values.recursive !== false;
+      } else if (values.source_type === 'wiki') {
+        connection_config.url = values.wiki_url || '';
+        connection_config.api_path = values.api_path || '/w/api.php';
+        if (values.wiki_username) connection_config.username = values.wiki_username;
+        if (values.wiki_password) connection_config.password = values.wiki_password;
+        if (values.namespaces) {
+          connection_config.namespaces = values.namespaces.split(',').map((s) => Number(s.trim())).filter((n) => !isNaN(n));
+        }
+      } else if (values.source_type === 'confluence') {
+        connection_config.url = values.confluence_url || '';
+        connection_config.username = values.confluence_username || '';
+        connection_config.api_token = values.api_token || '';
+        if (values.space_key) connection_config.space_key = values.space_key;
+      } else if (values.source_type === 'jira') {
+        connection_config.url = values.jira_url || '';
+        connection_config.username = values.jira_username || '';
+        connection_config.api_token = values.jira_api_token || '';
+        if (values.project_key) connection_config.project_key = values.project_key;
+        if (values.jql) connection_config.jql = values.jql;
+        connection_config.include_comments = values.include_comments !== false;
       }
 
       await createSource.mutateAsync({
@@ -143,6 +182,29 @@ export default function Sources() {
             <span style={{ fontSize: 12, color: '#666' }}>
               {String(config.base_path || '-')}
               {config.recursive !== false ? ' (递归)' : ''}
+            </span>
+          );
+        }
+        if (record.source_type === 'wiki') {
+          return (
+            <span style={{ fontSize: 12, color: '#666' }}>
+              {String(config.url || '-')}
+            </span>
+          );
+        }
+        if (record.source_type === 'confluence') {
+          return (
+            <span style={{ fontSize: 12, color: '#666' }}>
+              {String(config.url || '-')}
+              {config.space_key ? ` / ${config.space_key}` : ''}
+            </span>
+          );
+        }
+        if (record.source_type === 'jira') {
+          return (
+            <span style={{ fontSize: 12, color: '#666' }}>
+              {String(config.url || '-')}
+              {config.project_key ? ` / ${config.project_key}` : ''}
             </span>
           );
         }
@@ -242,6 +304,7 @@ export default function Sources() {
             <Switch />
           </Form.Item>
 
+          {/* File type fields */}
           {createSourceType === 'file' && (
             <>
               <Form.Item
@@ -255,6 +318,97 @@ export default function Sources() {
                 <Input placeholder="*.md, *.txt, *.json" />
               </Form.Item>
               <Form.Item name="recursive" label="递归子目录" valuePropName="checked" initialValue={true}>
+                <Switch />
+              </Form.Item>
+            </>
+          )}
+
+          {/* Wiki type fields */}
+          {createSourceType === 'wiki' && (
+            <>
+              <Form.Item
+                name="wiki_url"
+                label="Wiki URL"
+                rules={[{ required: createSourceType === 'wiki', message: '请输入 Wiki URL' }]}
+              >
+                <Input placeholder="https://wiki.example.com" />
+              </Form.Item>
+              <Form.Item name="api_path" label="API 路径" initialValue="/w/api.php">
+                <Input placeholder="/w/api.php" />
+              </Form.Item>
+              <Form.Item name="wiki_username" label="用户名 (可选)">
+                <Input placeholder="用于 Basic Auth 认证" />
+              </Form.Item>
+              <Form.Item name="wiki_password" label="密码 (可选)">
+                <Input.Password placeholder="用于 Basic Auth 认证" />
+              </Form.Item>
+              <Form.Item name="namespaces" label="命名空间 ID" initialValue="0">
+                <Input placeholder="0 (多个用逗号分隔，如 0,1,2)" />
+              </Form.Item>
+            </>
+          )}
+
+          {/* Confluence type fields */}
+          {createSourceType === 'confluence' && (
+            <>
+              <Form.Item
+                name="confluence_url"
+                label="Confluence URL"
+                rules={[{ required: createSourceType === 'confluence', message: '请输入 Confluence URL' }]}
+              >
+                <Input placeholder="https://your-domain.atlassian.net" />
+              </Form.Item>
+              <Form.Item
+                name="confluence_username"
+                label="用户名 / 邮箱"
+                rules={[{ required: createSourceType === 'confluence', message: '请输入用户名或邮箱' }]}
+              >
+                <Input placeholder="user@example.com" />
+              </Form.Item>
+              <Form.Item
+                name="api_token"
+                label="API Token"
+                rules={[{ required: createSourceType === 'confluence', message: '请输入 API Token' }]}
+              >
+                <Input.Password placeholder="Atlassian API Token" />
+              </Form.Item>
+              <Form.Item name="space_key" label="Space Key">
+                <Input placeholder="PROJ (留空则扫描全部)" />
+              </Form.Item>
+            </>
+          )}
+
+          {/* Jira type fields */}
+          {createSourceType === 'jira' && (
+            <>
+              <Form.Item
+                name="jira_url"
+                label="Jira URL"
+                rules={[{ required: createSourceType === 'jira', message: '请输入 Jira URL' }]}
+              >
+                <Input placeholder="https://your-domain.atlassian.net" />
+              </Form.Item>
+              <Form.Item
+                name="jira_username"
+                label="用户名 / 邮箱"
+                rules={[{ required: createSourceType === 'jira', message: '请输入用户名或邮箱' }]}
+              >
+                <Input placeholder="user@example.com" />
+              </Form.Item>
+              <Form.Item
+                name="jira_api_token"
+                label="API Token"
+                rules={[{ required: createSourceType === 'jira', message: '请输入 API Token' }]}
+              >
+                <Input.Password placeholder="Atlassian API Token" />
+              </Form.Item>
+              <Form.Item name="project_key" label="项目 Key">
+                <Input placeholder="PROJ" />
+              </Form.Item>
+              <Form.Item name="jql" label="JQL (可选)">
+                <Input placeholder="project = PROJ ORDER BY updated DESC" />
+              </Form.Item>
+              <Form.Item name="include_comments" label="包含评论" valuePropName="checked" initialValue={true}>
                 <Switch />
               </Form.Item>
             </>
