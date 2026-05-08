@@ -78,7 +78,7 @@ class DataSourceCreate(BaseModel):
     """Request body for creating a data source."""
     kb_id: str
     name: str
-    source_type: Literal["wiki", "confluence", "jira", "file", "conversation_log"]
+    source_type: Literal["wiki", "confluence", "jira", "file", "conversation_log", "webpage"]
     connection_config: dict = {}
     poll_interval_minutes: int = 60
     enabled: bool = True

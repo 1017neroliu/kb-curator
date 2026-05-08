@@ -13,6 +13,7 @@ const sourceTypeLabels: Record<string, string> = {
   jira: 'Jira',
   file: '文件目录',
   conversation_log: '对话日志',
+  webpage: '网页链接',
 };
 
 export default function Sources() {
@@ -63,6 +64,11 @@ export default function Sources() {
     project_key?: string;
     jql?: string;
     include_comments?: boolean;
+    // webpage fields
+    webpage_urls?: string;
+    css_selector?: string;
+    include_links?: boolean;
+    max_pages?: number;
   }) => {
     try {
       // Build connection_config from form fields
@@ -93,6 +99,14 @@ export default function Sources() {
         if (values.project_key) connection_config.project_key = values.project_key;
         if (values.jql) connection_config.jql = values.jql;
         connection_config.include_comments = values.include_comments !== false;
+      } else if (values.source_type === 'webpage') {
+        connection_config.urls = (values.webpage_urls || '')
+          .split('\n')
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0);
+        if (values.css_selector) connection_config.css_selector = values.css_selector;
+        connection_config.include_links = values.include_links === true;
+        connection_config.max_pages = values.max_pages || 50;
       }
 
       await createSource.mutateAsync({
@@ -205,6 +219,15 @@ export default function Sources() {
             <span style={{ fontSize: 12, color: '#666' }}>
               {String(config.url || '-')}
               {config.project_key ? ` / ${config.project_key}` : ''}
+            </span>
+          );
+        }
+        if (record.source_type === 'webpage') {
+          const urls = (config.urls as string[]) || [];
+          return (
+            <span style={{ fontSize: 12, color: '#666' }}>
+              {urls.length} 个 URL
+              {urls.length > 0 ? ` — ${urls[0]}` : ''}
             </span>
           );
         }
@@ -410,6 +433,28 @@ export default function Sources() {
               </Form.Item>
               <Form.Item name="include_comments" label="包含评论" valuePropName="checked" initialValue={true}>
                 <Switch />
+              </Form.Item>
+            </>
+          )}
+
+          {/* Webpage type fields */}
+          {createSourceType === 'webpage' && (
+            <>
+              <Form.Item
+                name="webpage_urls"
+                label="URL 列表"
+                rules={[{ required: createSourceType === 'webpage', message: '请输入至少一个 URL' }]}
+              >
+                <Input.TextArea rows={4} placeholder="每行一个 URL&#10;https://en.wikipedia.org/wiki/Knowledge_graph&#10;https://example.com/docs" />
+              </Form.Item>
+              <Form.Item name="css_selector" label="CSS 选择器 (可选)">
+                <Input placeholder="article, .content, #main" />
+              </Form.Item>
+              <Form.Item name="include_links" label="包含同域链接" valuePropName="checked" initialValue={false}>
+                <Switch />
+              </Form.Item>
+              <Form.Item name="max_pages" label="最大页面数" initialValue={50}>
+                <InputNumber min={1} max={500} style={{ width: '100%' }} />
               </Form.Item>
             </>
           )}

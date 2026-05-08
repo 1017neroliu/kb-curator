@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from kb_curator.adapters.confluence_adapter import ConfluenceAdapter
 from kb_curator.adapters.file_adapter import FileAdapter
 from kb_curator.adapters.jira_adapter import JiraAdapter
+from kb_curator.adapters.webpage_adapter import WebpageAdapter
 from kb_curator.adapters.wiki_adapter import WikiAdapter
 from kb_curator.adapters.base import BaseDocumentSource, DocumentChange
 from kb_curator.core.config import get_settings
@@ -56,6 +57,8 @@ def create_adapter(
         return ConfluenceAdapter(source_id, kb_id, connection_config)
     elif source_type == "jira":
         return JiraAdapter(source_id, kb_id, connection_config)
+    elif source_type == "webpage":
+        return WebpageAdapter(source_id, kb_id, connection_config)
     else:
         raise ValueError(f"Unsupported source type: {source_type}")
 

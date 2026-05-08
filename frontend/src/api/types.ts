@@ -13,7 +13,7 @@ export type ReviewTaskType = 'conflict_resolution' | 'quality_action' | 'depreca
 export type ReviewTaskStatus = 'pending' | 'in_progress' | 'resolved' | 'expired';
 export type Severity = 'info' | 'warning' | 'critical';
 export type QualityIssueType = 'low_hit_rate' | 'high_negative_feedback' | 'expired' | 'orphan_entity' | 'metadata_inconsistency';
-export type SourceType = 'wiki' | 'confluence' | 'jira' | 'file' | 'conversation_log';
+export type SourceType = 'wiki' | 'confluence' | 'jira' | 'file' | 'conversation_log' | 'webpage';
 export type InspectionType = 'full' | 'incremental' | 'targeted';
 
 // ============================================================

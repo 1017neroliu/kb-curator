@@ -42,6 +42,7 @@ def _validate_connection_config(source_type: str, config: dict) -> None:
         "wiki": ["url"],
         "confluence": ["url", "username", "api_token"],
         "jira": ["url", "username", "api_token"],
+        "webpage": ["urls"],
     }
     required = required_map.get(source_type)
     if not required:
