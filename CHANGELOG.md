@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/zh-CN/).
 
+## 2026-05-08
+
+### Added
+- Wiki/Confluence/Jira 数据源适配器，解决选这三种类型时"创建成功但无数据"的问题：
+  - 新建 `HttpAdapterMixin`：共享 httpx 异步客户端、Basic/Bearer 认证、3 次重试 + 429 限流等待 + 指数退避
+  - 新建 `WikiAdapter`：MediaWiki Action API（allpages 分页列表、recentchanges 增量轮询、wikitext→纯文本转换）
+  - 新建 `ConfluenceAdapter`：Confluence REST API v1（分页列表、CQL 增量轮询、storage HTML→纯文本转换）
+  - 新建 `JiraAdapter`：Jira REST API v2（JQL 搜索、issue→markdown 文档、ADF 递归文本提取、可选评论采集）
+  - `polling.py` 工厂函数 `create_adapter()` 新增 wiki/confluence/jira 三个分支
+  - `sources.py` 新增 `_validate_connection_config()` 校验必填字段
+  - 前端 `Sources.tsx` 创建表单新增 wiki/confluence/jira 条件字段，配置列按类型显示连接信息
+
 ## 2026-05-07
 
 ### Added
