@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/zh-CN/).
 ## 2026-05-08
 
 ### Added
+- 网页链接数据源适配器 (WebpageAdapter)，支持通过公开网页 URL 创建数据源：
+  - 新建 `webpage_adapter.py`：复用 `HttpAdapterMixin`，BeautifulSoup 提取正文，支持 CSS 选择器和同域链接跟随
+  - `schemas.py` DataSourceCreate.source_type 新增 `"webpage"`
+  - `polling.py` 工厂函数 `create_adapter()` 新增 webpage 分支
+  - `sources.py` `_validate_connection_config()` 新增 `urls` 必填校验
+  - 前端 `types.ts` SourceType 新增 `'webpage'`，`Sources.tsx` 新增网页链接表单和配置展示
 - Wiki/Confluence/Jira 数据源适配器，解决选这三种类型时"创建成功但无数据"的问题：
   - 新建 `HttpAdapterMixin`：共享 httpx 异步客户端、Basic/Bearer 认证、3 次重试 + 429 限流等待 + 指数退避
   - 新建 `WikiAdapter`：MediaWiki Action API（allpages 分页列表、recentchanges 增量轮询、wikitext→纯文本转换）
