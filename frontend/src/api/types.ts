@@ -61,6 +61,7 @@ export interface DataSourceRead {
   last_polled_at: string | null;
   last_fingerprint: string | null;
   enabled: boolean;
+  scan_status: 'pending' | 'scanning' | 'completed' | 'failed';
   created_at: string;
 }
 

@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/zh-CN/).
 
 ## 2026-05-08
 
+### Changed
+- 数据源创建弹窗优化：创建后立即关闭弹窗，初始扫描改为后台执行
+  - `sources.py` 使用 FastAPI `BackgroundTasks` 异步执行初始扫描，API 立即返回
+  - `DataSourceTable` 新增 `scan_status` 字段（pending/scanning/completed/failed）
+  - `db.py` `init_db()` 自动迁移旧表添加 `scan_status` 列
+  - 前端创建成功后立即关闭弹窗，显示后台扫描进度通知（loading → 成功/失败）
+  - 前端表格新增「扫描状态」列，实时显示扫描进度
+
 ### Added
 - 网页链接数据源适配器 (WebpageAdapter)，支持通过公开网页 URL 创建数据源：
   - 新建 `webpage_adapter.py`：复用 `HttpAdapterMixin`，BeautifulSoup 提取正文，支持 CSS 选择器和同域链接跟随

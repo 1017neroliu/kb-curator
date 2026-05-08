@@ -48,3 +48,12 @@ async def init_db() -> None:
     engine = get_engine()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Migrations: add columns that may not exist in older databases
+        from sqlalchemy import text
+        # Check if scan_status column exists in data_sources
+        result = await conn.execute(text("PRAGMA table_info(data_sources)"))
+        columns = [row[1] for row in result]
+        if "scan_status" not in columns:
+            await conn.execute(
+                text("ALTER TABLE data_sources ADD COLUMN scan_status VARCHAR(32) DEFAULT 'pending'")
+            )

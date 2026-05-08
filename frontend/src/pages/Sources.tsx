@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   Table, Button, Modal, Form, Input, Select, Switch, InputNumber, message, Popconfirm, Card, Empty, Tag, Space,
 } from 'antd';
-import { PlusOutlined, SyncOutlined } from '@ant-design/icons';
+import { PlusOutlined, SyncOutlined, LoadingOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import { useQueryClient } from '@tanstack/react-query';
 import { useSources, useCreateSource, useUpdateSource, useDeleteSource, usePollSources } from '../hooks/useSources';
 import type { DataSourceRead, SourceType } from '../api/types';
+import apiClient from '../api/client';
 
 const sourceTypeLabels: Record<string, string> = {
   wiki: 'Wiki',
@@ -16,6 +18,13 @@ const sourceTypeLabels: Record<string, string> = {
   webpage: '网页链接',
 };
 
+const scanStatusConfig: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
+  pending: { label: '待扫描', color: 'default', icon: null },
+  scanning: { label: '扫描中', color: 'processing', icon: <LoadingOutlined spin /> },
+  completed: { label: '已完成', color: 'success', icon: <CheckCircleOutlined /> },
+  failed: { label: '失败', color: 'error', icon: <CloseCircleOutlined /> },
+};
+
 export default function Sources() {
   const kbId = localStorage.getItem('kb_curator_kb_id') || undefined;
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -23,6 +32,7 @@ export default function Sources() {
   const [editingSource, setEditingSource] = useState<DataSourceRead | null>(null);
   const [createForm] = Form.useForm();
   const [editForm] = Form.useForm();
+  const queryClient = useQueryClient();
 
   const { data: sources, isLoading } = useSources(kbId);
   const createSource = useCreateSource(kbId);
@@ -32,6 +42,54 @@ export default function Sources() {
 
   // Watch source_type in create form for conditional config fields
   const createSourceType = Form.useWatch('source_type', createForm);
+
+  // Track scanning sources for progress notifications
+  const scanningRef = useRef<Map<string, ReturnType<typeof message.loading>>>(new Map());
+  const pollTimersRef = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      pollTimersRef.current.forEach((timer) => clearInterval(timer));
+      scanningRef.current.forEach((hide) => hide());
+    };
+  }, []);
+
+  /** Poll a source's scan_status until it reaches completed or failed. */
+  const pollScanStatus = (sourceId: string, sourceName: string) => {
+    // Show a loading notification
+    const hide = message.loading(`${sourceName}: 正在后台扫描...`, 0);
+    scanningRef.current.set(sourceId, hide);
+
+    const timer = setInterval(async () => {
+      try {
+        const { data } = await apiClient.get<DataSourceRead>(
+          `/knowledge-bases/${kbId}/sources/${sourceId}`,
+        );
+        if (data.scan_status === 'completed') {
+          clearInterval(timer);
+          pollTimersRef.current.delete(sourceId);
+          const hideMsg = scanningRef.current.get(sourceId);
+          if (hideMsg) { hideMsg(); scanningRef.current.delete(sourceId); }
+          message.success(`${sourceName}: 扫描完成`);
+          // Refresh the sources list
+          queryClient.invalidateQueries({ queryKey: ['sources', kbId] });
+          queryClient.invalidateQueries({ queryKey: ['entries', kbId] });
+        } else if (data.scan_status === 'failed') {
+          clearInterval(timer);
+          pollTimersRef.current.delete(sourceId);
+          const hideMsg = scanningRef.current.get(sourceId);
+          if (hideMsg) { hideMsg(); scanningRef.current.delete(sourceId); }
+          message.error(`${sourceName}: 扫描失败`);
+          queryClient.invalidateQueries({ queryKey: ['sources', kbId] });
+        }
+      } catch {
+        // Ignore polling errors, will retry on next interval
+      }
+    }, 2000);
+
+    pollTimersRef.current.set(sourceId, timer);
+  };
 
   if (!kbId) {
     return <Card><Empty description="请先选择知识库" style={{ marginTop: 40 }} /></Card>;
@@ -109,16 +167,24 @@ export default function Sources() {
         connection_config.max_pages = values.max_pages || 50;
       }
 
-      await createSource.mutateAsync({
+      const result = await createSource.mutateAsync({
         name: values.name,
         source_type: values.source_type,
         poll_interval_minutes: values.poll_interval_minutes,
         enabled: values.enabled,
         connection_config,
       });
-      message.success('数据源已创建');
+
+      // Close modal immediately — the initial scan runs in the background
       setCreateModalOpen(false);
       createForm.resetFields();
+
+      if (result.enabled && result.scan_status === 'scanning') {
+        message.info(`数据源「${result.name}」已创建，后台扫描已启动`);
+        pollScanStatus(result.id, result.name);
+      } else {
+        message.success('数据源已创建');
+      }
     } catch {
       message.error('创建失败');
     }
@@ -232,6 +298,20 @@ export default function Sources() {
           );
         }
         return '-';
+      },
+    },
+    {
+      title: '扫描状态',
+      dataIndex: 'scan_status',
+      key: 'scan_status',
+      width: 120,
+      render: (status: string) => {
+        const cfg = scanStatusConfig[status] || scanStatusConfig.pending;
+        return (
+          <Tag color={cfg.color} icon={cfg.icon}>
+            {cfg.label}
+          </Tag>
+        );
       },
     },
     {

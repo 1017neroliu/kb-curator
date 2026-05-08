@@ -115,6 +115,7 @@ class DataSourceTable(Base):
     last_polled_at: Mapped[datetime | None] = mapped_column(DateTime)
     last_fingerprint: Mapped[str | None] = mapped_column(String(128))
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    scan_status: Mapped[str] = mapped_column(String(32), default="pending")  # pending | scanning | completed | failed
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now())
 

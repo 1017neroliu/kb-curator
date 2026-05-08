@@ -94,6 +94,7 @@ class DataSourceRead(BaseModel):
     last_polled_at: datetime | None = None
     last_fingerprint: str | None = None
     enabled: bool = True
+    scan_status: str = "pending"
     created_at: datetime
 
 

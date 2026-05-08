@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from kb_curator.api.deps import SessionDep
@@ -61,8 +61,9 @@ async def create_source(
     kb_id: str,
     body: DataSourceCreate,
     session: SessionDep,
+    background_tasks: BackgroundTasks,
 ) -> DataSourceRead:
-    """Register a new data source and trigger an initial scan."""
+    """Register a new data source and trigger a background initial scan."""
     if body.kb_id != kb_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -75,18 +76,40 @@ async def create_source(
         log.error("create_source_failed", error=str(e))
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
-    # Trigger initial scan for enabled sources
+    # Trigger initial scan in the background for enabled sources
     if table.enabled:
-        try:
-            from kb_curator.services.polling import poll_data_source
-            from kb_curator.services.change_classifier import get_change_classifier
-            classifier = get_change_classifier()
-            await poll_data_source(session, table, classifier, create_entries=True)
-        except Exception as e:
-            # Initial scan failure should not fail the creation
-            log.warning("initial_scan_failed", source_id=table.id, error=str(e))
+        # Mark as scanning immediately
+        await update_data_source(session, table.id, scan_status="scanning")
+        table = await get_data_source(session, table.id)  # type: ignore[assignment]
+
+        source_id = table.id  # capture for closure
+        background_tasks.add_task(_run_initial_scan, source_id)
 
     return _table_to_read(table)
+
+
+async def _run_initial_scan(source_id: str) -> None:
+    """Background task: run initial scan for a newly created data source."""
+    from kb_curator.services.db import get_session_factory
+    from kb_curator.services.polling import poll_data_source
+    from kb_curator.services.change_classifier import get_change_classifier
+
+    session_factory = get_session_factory()
+    try:
+        async with session_factory() as session:
+            source = await get_data_source(session, source_id)
+            if not source:
+                return
+            classifier = get_change_classifier()
+            await poll_data_source(session, source, classifier, create_entries=True)
+            await update_data_source(session, source_id, scan_status="completed")
+    except Exception as e:
+        log.error("background_initial_scan_failed", source_id=source_id, error=str(e))
+        try:
+            async with session_factory() as session:
+                await update_data_source(session, source_id, scan_status="failed")
+        except Exception:
+            pass
 
 
 @router.get("", response_model=list[DataSourceRead])
@@ -226,5 +249,6 @@ def _table_to_read(table) -> DataSourceRead:
         last_polled_at=table.last_polled_at,
         last_fingerprint=table.last_fingerprint,
         enabled=table.enabled,
+        scan_status=getattr(table, "scan_status", "pending"),
         created_at=table.created_at,
     )
