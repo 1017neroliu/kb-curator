@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/zh-CN/).
 
 ## 2026-05-08
 
+### Fixed
+- WebpageAdapter 网页抓取被 403 拦截：覆盖默认 headers 使用浏览器 UA 和 Accept: text/html，health_check 改用 GET 且容忍 403，新增 cookies 配置支持需登录的网站
+
 ### Changed
 - 数据源创建弹窗优化：创建后立即关闭弹窗，初始扫描改为后台执行
   - `sources.py` 使用 FastAPI `BackgroundTasks` 异步执行初始扫描，API 立即返回
