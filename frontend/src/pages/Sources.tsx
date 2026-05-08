@@ -1,13 +1,12 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
-  Table, Button, Modal, Form, Input, Select, Switch, InputNumber, message, Popconfirm, Card, Empty, Tag, Space,
+  Table, Button, Modal, Form, Input, Select, Switch, InputNumber, message, Popconfirm, Card, Empty, Tag, Space, Progress,
 } from 'antd';
 import { PlusOutlined, SyncOutlined, LoadingOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSources, useCreateSource, useUpdateSource, useDeleteSource, usePollSources } from '../hooks/useSources';
 import type { DataSourceRead, SourceType } from '../api/types';
-import apiClient from '../api/client';
 
 const sourceTypeLabels: Record<string, string> = {
   wiki: 'Wiki',
@@ -16,13 +15,6 @@ const sourceTypeLabels: Record<string, string> = {
   file: '文件目录',
   conversation_log: '对话日志',
   webpage: '网页链接',
-};
-
-const scanStatusConfig: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
-  pending: { label: '待扫描', color: 'default', icon: null },
-  scanning: { label: '扫描中', color: 'processing', icon: <LoadingOutlined spin /> },
-  completed: { label: '已完成', color: 'success', icon: <CheckCircleOutlined /> },
-  failed: { label: '失败', color: 'error', icon: <CloseCircleOutlined /> },
 };
 
 export default function Sources() {
@@ -43,53 +35,30 @@ export default function Sources() {
   // Watch source_type in create form for conditional config fields
   const createSourceType = Form.useWatch('source_type', createForm);
 
-  // Track scanning sources for progress notifications
-  const scanningRef = useRef<Map<string, ReturnType<typeof message.loading>>>(new Map());
-  const pollTimersRef = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
+  // Auto-refresh sources list while any source is scanning
+  const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const hasScanning = (sources ?? []).some((s) => s.scan_status === 'scanning');
 
-  // Cleanup timers on unmount
   useEffect(() => {
-    return () => {
-      pollTimersRef.current.forEach((timer) => clearInterval(timer));
-      scanningRef.current.forEach((hide) => hide());
-    };
-  }, []);
-
-  /** Poll a source's scan_status until it reaches completed or failed. */
-  const pollScanStatus = (sourceId: string, sourceName: string) => {
-    // Show a loading notification
-    const hide = message.loading(`${sourceName}: 正在后台扫描...`, 0);
-    scanningRef.current.set(sourceId, hide);
-
-    const timer = setInterval(async () => {
-      try {
-        const { data } = await apiClient.get<DataSourceRead>(
-          `/knowledge-bases/${kbId}/sources/${sourceId}`,
-        );
-        if (data.scan_status === 'completed') {
-          clearInterval(timer);
-          pollTimersRef.current.delete(sourceId);
-          const hideMsg = scanningRef.current.get(sourceId);
-          if (hideMsg) { hideMsg(); scanningRef.current.delete(sourceId); }
-          message.success(`${sourceName}: 扫描完成`);
-          // Refresh the sources list
+    if (hasScanning) {
+      if (!refreshTimerRef.current) {
+        refreshTimerRef.current = setInterval(() => {
           queryClient.invalidateQueries({ queryKey: ['sources', kbId] });
-          queryClient.invalidateQueries({ queryKey: ['entries', kbId] });
-        } else if (data.scan_status === 'failed') {
-          clearInterval(timer);
-          pollTimersRef.current.delete(sourceId);
-          const hideMsg = scanningRef.current.get(sourceId);
-          if (hideMsg) { hideMsg(); scanningRef.current.delete(sourceId); }
-          message.error(`${sourceName}: 扫描失败`);
-          queryClient.invalidateQueries({ queryKey: ['sources', kbId] });
-        }
-      } catch {
-        // Ignore polling errors, will retry on next interval
+        }, 3000);
       }
-    }, 2000);
-
-    pollTimersRef.current.set(sourceId, timer);
-  };
+    } else {
+      if (refreshTimerRef.current) {
+        clearInterval(refreshTimerRef.current);
+        refreshTimerRef.current = null;
+      }
+    }
+    return () => {
+      if (refreshTimerRef.current) {
+        clearInterval(refreshTimerRef.current);
+        refreshTimerRef.current = null;
+      }
+    };
+  }, [hasScanning, kbId, queryClient]);
 
   if (!kbId) {
     return <Card><Empty description="请先选择知识库" style={{ marginTop: 40 }} /></Card>;
@@ -178,13 +147,7 @@ export default function Sources() {
       // Close modal immediately — the initial scan runs in the background
       setCreateModalOpen(false);
       createForm.resetFields();
-
-      if (result.enabled && result.scan_status === 'scanning') {
-        message.info(`数据源「${result.name}」已创建，后台扫描已启动`);
-        pollScanStatus(result.id, result.name);
-      } else {
-        message.success('数据源已创建');
-      }
+      message.success(`数据源「${result.name}」已创建` + (result.scan_status === 'scanning' ? '，后台扫描已启动' : ''));
     } catch {
       message.error('创建失败');
     }
@@ -304,14 +267,36 @@ export default function Sources() {
       title: '扫描状态',
       dataIndex: 'scan_status',
       key: 'scan_status',
-      width: 120,
+      width: 160,
       render: (status: string) => {
-        const cfg = scanStatusConfig[status] || scanStatusConfig.pending;
-        return (
-          <Tag color={cfg.color} icon={cfg.icon}>
-            {cfg.label}
-          </Tag>
-        );
+        if (status === 'scanning') {
+          return (
+            <Space direction="vertical" size={2} style={{ width: '100%' }}>
+              <Space size={4}>
+                <LoadingOutlined spin style={{ color: '#1677ff' }} />
+                <span style={{ fontSize: 12, color: '#1677ff' }}>扫描中</span>
+              </Space>
+              <Progress percent={99} size="small" status="active" showInfo={false} />
+            </Space>
+          );
+        }
+        if (status === 'completed') {
+          return (
+            <Space size={4}>
+              <CheckCircleOutlined style={{ color: '#52c41a' }} />
+              <span style={{ fontSize: 12, color: '#52c41a' }}>已完成</span>
+            </Space>
+          );
+        }
+        if (status === 'failed') {
+          return (
+            <Space size={4}>
+              <CloseCircleOutlined style={{ color: '#ff4d4f' }} />
+              <span style={{ fontSize: 12, color: '#ff4d4f' }}>失败</span>
+            </Space>
+          );
+        }
+        return <span style={{ fontSize: 12, color: '#999' }}>待扫描</span>;
       },
     },
     {
