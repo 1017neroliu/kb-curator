@@ -96,6 +96,7 @@ export default function Sources() {
     css_selector?: string;
     include_links?: boolean;
     max_pages?: number;
+    cookies?: string;
   }) => {
     try {
       // Build connection_config from form fields
@@ -134,6 +135,14 @@ export default function Sources() {
         if (values.css_selector) connection_config.css_selector = values.css_selector;
         connection_config.include_links = values.include_links === true;
         connection_config.max_pages = values.max_pages || 50;
+        if (values.cookies) {
+          const cookieObj: Record<string, string> = {};
+          values.cookies.split(';').map((s) => s.trim()).filter((s) => s.length > 0).forEach((pair) => {
+            const idx = pair.indexOf('=');
+            if (idx > 0) cookieObj[pair.substring(0, idx).trim()] = pair.substring(idx + 1).trim();
+          });
+          if (Object.keys(cookieObj).length > 0) connection_config.cookies = cookieObj;
+        }
       }
 
       const result = await createSource.mutateAsync({
@@ -520,6 +529,9 @@ export default function Sources() {
               </Form.Item>
               <Form.Item name="max_pages" label="最大页面数" initialValue={50}>
                 <InputNumber min={1} max={500} style={{ width: '100%' }} />
+              </Form.Item>
+              <Form.Item name="cookies" label="Cookies (可选)" tooltip="部分网站（如知乎）需登录 Cookie 才能访问，格式: key1=val1; key2=val2">
+                <Input placeholder="key1=value1; key2=value2" />
               </Form.Item>
             </>
           )}

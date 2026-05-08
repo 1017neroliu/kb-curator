@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Any
 from urllib.parse import urljoin, urlparse
 
+import httpx
 from bs4 import BeautifulSoup
 
 from kb_curator.adapters.base import BaseDocumentSource, DocumentChange, DocumentMetadata
@@ -16,6 +17,12 @@ from kb_curator.core.logging import get_logger
 from kb_curator.models.schemas import ChangeType
 
 log = get_logger(__name__)
+
+# Browser-like User-Agent to avoid being blocked by anti-bot systems
+_DEFAULT_UA = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+)
 
 
 class WebpageAdapter(HttpAdapterMixin, BaseDocumentSource):
@@ -30,6 +37,8 @@ class WebpageAdapter(HttpAdapterMixin, BaseDocumentSource):
         max_pages (int): Maximum number of pages to fetch per scan. Default ``50``.
         request_delay (float): Delay between requests in seconds. Default ``0.5``.
         timeout (float): HTTP request timeout in seconds. Default ``30.0``.
+        cookies (dict[str, str] | None): Cookies to send with each request.
+            Useful for sites that require login (e.g. Zhihu).
     """
 
     def __init__(
@@ -46,6 +55,7 @@ class WebpageAdapter(HttpAdapterMixin, BaseDocumentSource):
         self._max_pages: int = connection_config.get("max_pages", 50)
         self._request_delay: float = connection_config.get("request_delay", 0.5)
         self._timeout: float = connection_config.get("timeout", 30.0)
+        self._cookies: dict[str, str] | None = connection_config.get("cookies")
 
         # HttpAdapterMixin expects these attributes
         self._base_url = ""
@@ -53,6 +63,29 @@ class WebpageAdapter(HttpAdapterMixin, BaseDocumentSource):
         self._username = None
         self._password = None
         self._bearer_token = None
+
+    # ------------------------------------------------------------------
+    # Override headers for web scraping (browser-like)
+    # ------------------------------------------------------------------
+
+    def _build_headers(self) -> dict[str, str]:
+        """Build browser-like headers for web scraping."""
+        return {
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+            "User-Agent": _DEFAULT_UA,
+        }
+
+    def _get_client(self) -> httpx.AsyncClient:
+        """Lazily create (and reuse) an httpx.AsyncClient with browser headers."""
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(
+                headers=self._build_headers(),
+                cookies=self._cookies or None,
+                timeout=httpx.Timeout(self._timeout, connect=10.0),
+                follow_redirects=True,
+            )
+        return self._client
 
     # ------------------------------------------------------------------
     # Helper: build a short, stable document ID from a URL
@@ -123,9 +156,28 @@ class WebpageAdapter(HttpAdapterMixin, BaseDocumentSource):
     # ------------------------------------------------------------------
 
     async def _fetch_page(self, url: str) -> str | None:
-        """GET a single URL and return its HTML body, or None on failure."""
+        """GET a single URL and return its HTML body, or None on failure.
+
+        Uses the httpx client directly (bypasses mixin _request) so that
+        403 responses are treated as a fetch failure rather than an auth error.
+        """
         try:
-            resp = await self._request("GET", url)
+            import asyncio
+
+            if self._request_delay > 0:
+                await asyncio.sleep(self._request_delay)
+
+            client = self._get_client()
+            resp = await client.get(url)
+
+            if resp.status_code >= 400:
+                log.warning(
+                    "webpage_fetch_status_error",
+                    url=url,
+                    status=resp.status_code,
+                )
+                return None
+
             return resp.text
         except Exception as e:
             log.warning("webpage_fetch_failed", url=url, error=str(e))
@@ -169,12 +221,19 @@ class WebpageAdapter(HttpAdapterMixin, BaseDocumentSource):
     # ------------------------------------------------------------------
 
     async def health_check(self) -> bool:
-        """HEAD request the first URL; status < 400 means healthy."""
+        """GET the first URL; any response (even 403) means the host is reachable.
+
+        Many websites return 403 for HEAD requests or bot-like User-Agents,
+        but still serve content for full GET requests with browser headers.
+        We only report unhealthy on transport errors (DNS, timeout, etc.).
+        """
         if not self._urls:
             return False
         try:
-            resp = await self._request("HEAD", self._urls[0])
-            return resp.status_code < 400
+            client = self._get_client()
+            resp = await client.get(self._urls[0])
+            # Any HTTP response (even 4xx) means the server is reachable
+            return True
         except Exception as e:
             log.error("webpage_health_check_failed", error=str(e))
             return False
