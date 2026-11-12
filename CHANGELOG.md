@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/zh-CN/).
 
+## 2026-11-12
+
+### Added
+- 新增项目 README：介绍主要功能、技术栈、本地启动流程、配置、使用方式和开发检查，并说明当前 Docker 部署的配置限制
+
 ## 2026-05-08
 
 ### Fixed
